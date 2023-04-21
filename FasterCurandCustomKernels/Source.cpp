@@ -80,13 +80,13 @@ int main()
 	memset(hist, 0, bins * sizeof(float));
 	for (int i = 0; i < samples; i++)
 	{
-		int bin = (output[i] * 0.2 + 1) * bins * 0.5f;
+		int bin = (output[i] * 0.4 + 1) * bins * 0.5f;
 		if (bin >= 0 && bin < bins)
 			hist[bin]++;
 	}
 	for (int i = 0; i < bins; i++)
 	{
-		for (int j = 0; j < hist[i] * scale * 10; j++)
+		for (int j = 0; j < hist[i] * scale * 20; j++)
 			printf("*");
 		printf("\n");
 	}
