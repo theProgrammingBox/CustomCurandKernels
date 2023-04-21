@@ -32,7 +32,7 @@ __global__ void cudaGenerate(float* output, uint32_t seed, uint32_t samples)
 
 int main()
 {
-	const uint32_t iterations = 10;
+	const uint32_t iterations = 1000;
 	const uint32_t samples = 1000000;
 	float* output = new float[samples];
 	float* d_output;
@@ -64,7 +64,7 @@ int main()
 	cudaEventCreate(&stop);
 	cudaEventRecord(start, 0);
 	for (uint32_t i = 0; i < iterations; i++)
-		cudaGenerate <<<std::ceil(0.0009765625f * samples), 1024 >>> (d_output, seed++, samples);
+		cudaGenerate << <std::ceil(0.0009765625f * samples), 1024 >> > (d_output, seed++, samples);
 	cudaEventRecord(stop, 0);
 	cudaEventSynchronize(stop);
 	cudaEventElapsedTime(&time, start, stop);
@@ -74,19 +74,19 @@ int main()
 	cudaMemcpy(output, d_output, samples * sizeof(float), cudaMemcpyDeviceToHost);
 
 	// historgam
-	const uint32_t bins = 50;
+	const uint32_t bins = 100;
 	const float scale = float(bins) / samples;
 	float hist[bins];
 	memset(hist, 0, bins * sizeof(float));
 	for (int i = 0; i < samples; i++)
 	{
-		int bin = (output[i] * 0.4 + 1) * bins * 0.5f;
+		int bin = (output[i] * 0.3 + 1) * bins * 0.5f;
 		if (bin >= 0 && bin < bins)
 			hist[bin]++;
 	}
 	for (int i = 0; i < bins; i++)
 	{
-		for (int j = 0; j < hist[i] * scale * 20; j++)
+		for (int j = 0; j < hist[i] * scale * 40; j++)
 			printf("*");
 		printf("\n");
 	}
