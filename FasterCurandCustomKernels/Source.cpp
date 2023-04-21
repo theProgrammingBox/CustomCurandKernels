@@ -3,7 +3,7 @@
 #include <curand.h>
 #include <cuda_fp16.h>
 
-__global__ void cudaGeneratef16(float* output, uint32_t seed, uint32_t samples)
+__global__ void cudaGenerate(float* output, uint32_t seed, uint32_t samples)
 {
 	uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
 	samples = idx * 0xcc9e2d51;
@@ -18,13 +18,22 @@ __global__ void cudaGeneratef16(float* output, uint32_t seed, uint32_t samples)
 	seed ^= seed >> 13;
 	seed *= 0xc2b2ae35;
 	seed ^= seed >> 16;
-	output[idx] = seed * 2.3283064365386963e-10f;
+	float u1 = seed * 2.3283064365386963e-10f;
+	seed ^= 4;
+	seed ^= seed >> 16;
+	seed *= 0x85ebca6b;
+	seed ^= seed >> 13;
+	seed *= 0xc2b2ae35;
+	seed ^= seed >> 16;
+	float u2 = seed * 2.3283064365386963e-10f;
+
+	output[idx] = sqrtf(-2.0f * logf(u1)) * cosf(2.0f * 3.14159265358979323846f * u2);
 }
 
 int main()
 {
 	const uint32_t iterations = 10;
-	const uint32_t samples = 100000000;
+	const uint32_t samples = 1000000;
 	float* output = new float[samples];
 	float* d_output;
 	cudaMalloc(&d_output, samples * sizeof(float));
@@ -65,18 +74,23 @@ int main()
 	cudaMemcpy(output, d_output, samples * sizeof(float), cudaMemcpyDeviceToHost);
 
 	// historgam
-	const uint32_t bins = 30;
+	const uint32_t bins = 50;
 	const float scale = float(bins) / samples;
 	float hist[bins];
 	memset(hist, 0, bins * sizeof(float));
 	for (int i = 0; i < samples; i++)
 	{
-		int bin = output[i] * bins;
+		int bin = (output[i] * 0.2 + 1) * bins * 0.5f;
 		if (bin >= 0 && bin < bins)
 			hist[bin]++;
 	}
 	for (int i = 0; i < bins; i++)
-		printf("%f\n", scale * hist[i]);
+	{
+		for (int j = 0; j < hist[i] * scale * 10; j++)
+			printf("*");
+		printf("\n");
+	}
+	printf("\n");
 
 	// cleanup
 	cudaFree(d_output);
