@@ -3,13 +3,11 @@
 #include <curand.h>
 #include <cuda_fp16.h>
 
-__global__ void cudaGenerate(uint32_t* output, uint64_t seed, uint32_t samples)
+__global__ void cudaGenerate(uint32_t* output, uint64_t seed)
 {
-	uint64_t idx = ((uint64_t)blockIdx.x << 10) + (threadIdx.x << 1);
+	uint64_t idx = ((uint64_t)blockIdx.x << 11) + (threadIdx.x << 1);
 	seed ^= (uint64_t)__brev((uint32_t)seed) << 32;
-	uint64_t const bitflip = 0x0E4125884092CA03ULL - seed;
-	uint64_t const input64 = (idx >> 32) + (idx << 32);
-	uint64_t keyed = input64 ^ bitflip;
+	uint64_t keyed = ((idx >> 32) + (idx << 32)) ^ (0x0E4125884092CA03ULL - seed);
 	keyed ^= ((keyed << 49) | (keyed >> 15)) ^ ((keyed << 24) | (keyed >> 40));
 	keyed *= 0x9FB21C651E98DF25ULL;
 	keyed ^= (keyed >> 35) + 8;
@@ -22,7 +20,7 @@ __global__ void cudaGenerate(uint32_t* output, uint64_t seed, uint32_t samples)
 int main()
 {
 	const uint32_t iterations = 100000;
-	const uint32_t samples = 1000000;
+	const uint32_t samples = 10000000;
 
 
 	float time;
@@ -40,7 +38,7 @@ int main()
 
 
 	for (uint32_t i = 0; i < iterations; i++)
-		cudaGenerate << <(samples >> 11) + bool(samples & 0x7ff), 0x400 >> > (d_output, seed++, samples);
+		cudaGenerate << <(samples >> 11) + bool(samples & 0x7ff), 0x400 >> > (d_output, seed++);
 
 
 	cudaEventCreate(&start);
@@ -48,7 +46,7 @@ int main()
 	cudaEventRecord(start, 0);
 	for (uint32_t i = 0; i < iterations; i++)
 		curandGenerate(gen, d_output, samples);
-	// cudaGenerate <<<(samples >> 11) + bool(samples & 0x7ff), 0x400>>> (d_output, seed++, samples);
+	// cudaGenerate <<<(samples >> 11) + bool(samples & 0x7ff), 0x400>>> (d_output, seed++);
 	cudaEventRecord(stop, 0);
 	cudaEventSynchronize(stop);
 	cudaEventElapsedTime(&time, start, stop);
