@@ -3,9 +3,10 @@
 #include <curand.h>
 #include <cuda_fp16.h>
 
-__global__ void cudaGenerate(uint32_t* output, uint64_t seed)
+__global__ void devCudaGenerate(__half* output, uint64_t seed)
 {
-	uint64_t idx = ((uint64_t)blockIdx.x << 11) + (threadIdx.x << 1);
+	const uint64_t idx = ((uint64_t)blockIdx.x << 12) + (threadIdx.x << 2);
+	const __half scale = __float2half(0.0000152587890625f);
 	seed ^= (uint64_t)__brev((uint32_t)seed) << 32;
 	uint64_t keyed = ((idx >> 32) + (idx << 32)) ^ (0x0E4125884092CA03ULL - seed);
 	keyed ^= ((keyed << 49) | (keyed >> 15)) ^ ((keyed << 24) | (keyed >> 40));
@@ -13,14 +14,25 @@ __global__ void cudaGenerate(uint32_t* output, uint64_t seed)
 	keyed ^= (keyed >> 35) + 8;
 	keyed *= 0x9FB21C651E98DF25ULL;
 	keyed ^= keyed >> 28;
-	output[idx] = keyed;
-	output[idx + 1] = keyed >> 32;
+	__half uniform1 = __float2half(uint16_t(keyed)) * scale;
+	__half uniform2 = __float2half(uint16_t(keyed >> 16)) * scale;
+	__half uniform3 = __float2half(uint16_t(keyed >> 32)) * scale;
+	__half uniform4 = __float2half(uint16_t(keyed >> 48)) * scale;
+	output[idx] = uniform1;
+	output[idx + 1] = uniform2;
+	output[idx + 2] = uniform3;
+	output[idx + 3] = uniform4;
+}
+
+void cudaGenerate(__half* output, uint64_t& seed, uint64_t samples)
+{
+	devCudaGenerate << <(samples >> 12) + bool(samples & 0x1fff), 0x400 >> > (output, seed++);
 }
 
 int main()
 {
-	const uint32_t iterations = 100000;
-	const uint32_t samples = 10000000;
+	const uint64_t iterations = 10000;
+	const uint64_t samples = 10000000;
 
 
 	float time;
@@ -32,36 +44,34 @@ int main()
 	curandSetPseudoRandomGeneratorSeed(gen, seed);
 
 
-	uint32_t* output = new uint32_t[samples];
-	uint32_t* d_output;
-	cudaMalloc(&d_output, samples * sizeof(uint32_t));
+	__half* output = new __half[samples];
+	__half* d_output;
+	cudaMalloc(&d_output, samples * sizeof(__half));
 
 
 	for (uint32_t i = 0; i < iterations; i++)
-		cudaGenerate << <(samples >> 11) + bool(samples & 0x7ff), 0x400 >> > (d_output, seed++);
+		cudaGenerate(d_output, seed, samples);
 
 
 	cudaEventCreate(&start);
 	cudaEventCreate(&stop);
 	cudaEventRecord(start, 0);
 	for (uint32_t i = 0; i < iterations; i++)
-		curandGenerate(gen, d_output, samples);
-	// cudaGenerate <<<(samples >> 11) + bool(samples & 0x7ff), 0x400>>> (d_output, seed++);
+		// curandGenerate(gen, d_output, samples);
+		cudaGenerate(d_output, seed, samples);
 	cudaEventRecord(stop, 0);
 	cudaEventSynchronize(stop);
 	cudaEventElapsedTime(&time, start, stop);
 	printf("Time: %f ms\n", time / iterations);
 
 
-	cudaMemcpy(output, d_output, samples * sizeof(uint32_t), cudaMemcpyDeviceToHost);
-	for (int i = 1024; i < 1030; i++)
+	cudaMemcpy(output, d_output, samples * sizeof(__half), cudaMemcpyDeviceToHost);
+	for (int i = 1024; i < 1050; i++)
 	{
-		// printf("%f\n", __half2float(output[i]));
-		for (int j = 0; j < 16; j++)
-		{
-			printf("%u", *(uint16_t*)(output + i) >> (15 - j) & 1);
-		}
-		printf("\n");
+		printf("%f\n", __half2float(output[i]));
+		// for (int j = 8; j--;)
+		//   printf("%u", *(uint8_t*)(output + i) >> j & 1);
+		// printf("\n");
 	}
 
 
