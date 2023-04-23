@@ -7,6 +7,7 @@
 
 __global__ void cudaFill(void* output, uint64_t seed, uint64_t offset)
 {
+    //const __half scale = __float2half(1.0f / 0xffff);
     const uint64_t idx = ((uint64_t)blockIdx.x << 10) + threadIdx.x;
     seed ^= (uint64_t)__brev((uint32_t)seed) << 32;
     offset += idx;
@@ -16,7 +17,8 @@ __global__ void cudaFill(void* output, uint64_t seed, uint64_t offset)
     offset ^= (offset >> 35) + 8;
     offset *= 0x9FB21C651E98DF25ULL;
     offset ^= offset >> 28;
-    *((uint64_t*)output + idx) = offset;
+    //*((uint64_t*)output + idx) = offset;
+    *((__half*)output + idx) = (offset & 0xffff) * 0.00
 }
 
 void Fill(void* output, uint64_t f16s, uint64_t& seed, uint64_t& offset)
@@ -53,7 +55,7 @@ void TestStats(void* gpuArr, void* cpuArr, uint64_t f16s)
 
 int main()
 {
-    const uint64_t f16s = (uint64_t)1 << 31;
+    const uint64_t f16s = (uint64_t)1 << 12;
 
     void* cpuArr = malloc(f16s << 2);
     void* gpuArr;
