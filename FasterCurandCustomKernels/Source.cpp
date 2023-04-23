@@ -82,7 +82,7 @@ int main()
         cudaEventElapsedTime(&milliseconds, start, stop);
         averageMilliseconds += milliseconds;
     }
-    printf("average time: %fms\n\n", averageMilliseconds / 0xff);
+    printf("average time: %fms\n", averageMilliseconds / 0xff);
     TestStats(gpuArr, cpuArr, f16s);
 
     printf("Testing cuRAND...\n");
@@ -98,7 +98,7 @@ int main()
         cudaEventElapsedTime(&milliseconds, start, stop);
         averageMilliseconds += milliseconds;
     }
-    printf("average time: %fms\n\n", averageMilliseconds / 0xff);
+    printf("average time: %fms\n", averageMilliseconds / 0xff);
     TestStats(gpuArr, cpuArr, f16s);
 
     /*for (uint64_t i = 0; i < f16s; i++)
