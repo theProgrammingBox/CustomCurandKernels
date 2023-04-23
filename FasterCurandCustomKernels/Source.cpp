@@ -1,5 +1,6 @@
 #include <iostream>
 #include <assert.h>
+#include <chrono>
 #include <cuda_runtime.h>
 #include <curand.h>
 #include <cuda_fp16.h>
@@ -20,11 +21,11 @@ __global__ void cudaFill(void* output, uint64_t seed, uint64_t offset)
 
 void Fill(void* output, uint64_t f16s, uint64_t& seed, uint64_t& offset)
 {
-    // cuda assert multiple of 1024
-    assert((f16s & 0x3ff) == 0);
+    // assert multiple of 4096
+    assert((f16s & 0xfff) == 0);
     cudaFill<<<f16s >> 12, 0x400>>>(output, seed, offset);
     seed++;
-    offset += f16s;
+    offset += 3;
 }
 
 void TestStats(void* gpuArr, void* cpuArr, uint64_t f16s)
@@ -52,45 +53,53 @@ void TestStats(void* gpuArr, void* cpuArr, uint64_t f16s)
 
 int main()
 {
-    const uint64_t f16s = (uint64_t)1 << 28;
+    const uint64_t f16s = (uint64_t)1 << 31;
 
     void* cpuArr = malloc(f16s << 2);
     void* gpuArr;
     cudaMalloc(&gpuArr, f16s << 2);
 
-    uint64_t seed = 0;
-    uint64_t offset = 0;
+    uint64_t seed = std::chrono::high_resolution_clock::now().time_since_epoch().count();
+    uint64_t offset = std::chrono::high_resolution_clock::now().time_since_epoch().count();
     float milliseconds = 0;
+    float averageMilliseconds = 0;
     cudaEvent_t start, stop;
 
     curandGenerator_t gen;
     curandCreateGenerator(&gen, CURAND_RNG_PSEUDO_DEFAULT);
     curandSetPseudoRandomGeneratorSeed(gen, seed);
 
-    //warmup
-    Fill(gpuArr, f16s, seed, offset);
-    curandGenerate(gen, (uint32_t*)gpuArr, f16s >> 1);
-
-    cudaEventCreate(&start);
-    cudaEventCreate(&stop);
-    cudaEventRecord(start);
-    Fill(gpuArr, f16s, seed, offset);
-    cudaEventRecord(stop);
-    cudaEventSynchronize(stop);
-    cudaEventElapsedTime(&milliseconds, start, stop);
-    printf("time: %fms\n", milliseconds);
+    printf("Testing custom kernel...\n");
+    averageMilliseconds = 0;
+    for (uint8_t i = 0xff; i--;)
+    {
+        cudaEventCreate(&start);
+        cudaEventCreate(&stop);
+        cudaEventRecord(start);
+        Fill(gpuArr, f16s, seed, offset);
+        cudaEventRecord(stop);
+        cudaEventSynchronize(stop);
+        cudaEventElapsedTime(&milliseconds, start, stop);
+        averageMilliseconds += milliseconds;
+    }
+    printf("average time: %fms\n\n", averageMilliseconds / 0xff);
     TestStats(gpuArr, cpuArr, f16s);
 
-    cudaEventCreate(&start);
-    cudaEventCreate(&stop);
-    cudaEventRecord(start);
-    curandGenerate(gen, (uint32_t*)gpuArr, f16s >> 1);
-    cudaEventRecord(stop);
-    cudaEventSynchronize(stop);
-    cudaEventElapsedTime(&milliseconds, start, stop);
-    printf("time: %fms\n", milliseconds);
+    printf("Testing cuRAND...\n");
+    averageMilliseconds = 0;
+    for (uint8_t i = 0xff; i--;)
+    {
+        cudaEventCreate(&start);
+        cudaEventCreate(&stop);
+        cudaEventRecord(start);
+        curandGenerate(gen, (uint32_t*)gpuArr, f16s >> 1);
+        cudaEventRecord(stop);
+        cudaEventSynchronize(stop);
+        cudaEventElapsedTime(&milliseconds, start, stop);
+        averageMilliseconds += milliseconds;
+    }
+    printf("average time: %fms\n\n", averageMilliseconds / 0xff);
     TestStats(gpuArr, cpuArr, f16s);
-
 
     /*for (uint64_t i = 0; i < f16s; i++)
     {
