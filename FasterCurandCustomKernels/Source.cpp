@@ -18,7 +18,10 @@ __global__ void cudaFill(void* output, uint64_t seed, uint64_t offset)
     offset *= 0x9FB21C651E98DF25ULL;
     offset ^= offset >> 28;
     //*((uint64_t*)output + idx) = offset;
-    *((__half*)output + idx) = (offset & 0xffff) * 0.00
+    *((__half*)output + idx) = __float2half((offset & 0xffff) * 0.0000152587890625f);
+    *((__half*)output + idx + 1) = __float2half(((offset >> 16) & 0xfff) * 0.0000152587890625f);
+    *((__half*)output + idx + 2) = __float2half(((offset >> 32) & 0xfff) * 0.0000152587890625f);
+    *((__half*)output + idx + 3) = __float2half(((offset >> 48) & 0xfff) * 0.0000152587890625f);
 }
 
 void Fill(void* output, uint64_t f16s, uint64_t& seed, uint64_t& offset)
