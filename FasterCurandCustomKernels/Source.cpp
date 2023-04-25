@@ -40,7 +40,7 @@ __global__ void cudaFill(const void* output, uint64_t seed, uint64_t offset)
     arr[2] = __float2half(r2 * cos1);
     arr[3] = __float2half(r2 * sin1);
     *((uint64_t*)output + idx) = *(uint64_t*)arr;
- }
+}
 
 void Fill(const void* output, uint64_t f16s, uint64_t& seed, uint64_t& offset)
 {
