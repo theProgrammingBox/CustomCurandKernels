@@ -24,10 +24,9 @@ __global__ void cudaFill(const void* output, uint64_t seed, uint64_t offset)
     offset ^= offset >> 28;
 
     float u1 = (float)(offset & 0xffffffff | 0x1) * scale;
-    float u2 = (float)((offset >> 32) | 0x1) * scale;
+    float u2 = (float)(offset >> 32) * scale;
 
     float r1 = sqrt(nTwo * log(u1));
-    float r2 = sqrt(nTwo * log(u2));
     float theta1 = twoPi * u1;
     float theta2 = twoPi * u2;
     float sin1, cos1, sin2, cos2;
@@ -35,10 +34,10 @@ __global__ void cudaFill(const void* output, uint64_t seed, uint64_t offset)
     sincos(theta2, &sin2, &cos2);
 
     __half arr[4];
-    arr[0] = __float2half(r1 * cos2);
-    arr[1] = __float2half(r1 * sin2);
-    arr[2] = __float2half(r2 * cos1);
-    arr[3] = __float2half(r2 * sin1);
+    arr[0] = __float2half(r1 * cos1);
+    arr[1] = __float2half(r1 * sin1);
+    arr[2] = __float2half(r1 * cos2);
+    arr[3] = __float2half(r1 * sin2);
     *((uint64_t*)output + idx) = *(uint64_t*)arr;
  }
 
