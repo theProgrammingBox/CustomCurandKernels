@@ -9,9 +9,9 @@
 
 __global__ void cudaFill(const void* output, uint64_t seed, uint64_t offset)
 {
-    const __half halfScale = __float2half(0.0000152587890625f);
-    const __half halfNTwo = __float2half(-2.0f);
-    const __half halfTwoPi = __float2half(6.283185307179586476925286766559f);
+    const float scale = 2.3283064365386962890625e-10f;
+    const float nTwo = -2.0f;
+    const float twoPi = 6.283185307179586476925286766559f;
 
     const uint64_t idx = ((uint64_t)blockIdx.x << 10) + threadIdx.x;
     seed ^= (uint64_t)__brev((uint32_t)seed) << 32;
@@ -22,25 +22,23 @@ __global__ void cudaFill(const void* output, uint64_t seed, uint64_t offset)
     offset ^= (offset >> 35) + 8;
     offset *= 0x9FB21C651E98DF25ULL;
     offset ^= offset >> 28;
+
+    float u1 = (float)(offset & 0xffffffff | 0x1) * scale;
+    float u2 = (float)((offset >> 32) | 0x1) * scale;
+
+    float r1 = sqrt(nTwo * log(u1));
+    float r2 = sqrt(nTwo * log(u2));
+    float theta1 = twoPi * u1;
+    float theta2 = twoPi * u2;
+    float sin1, cos1, sin2, cos2;
+    sincos(theta1, &sin1, &cos1);
+    sincos(theta2, &sin2, &cos2);
+
     __half arr[4];
-    arr[0] = __hmul(__float2half(offset & 0xffff), halfScale);
-    arr[1] = __hmul(__float2half((offset >> 16) & 0xffff), halfScale);
-    arr[2] = __hmul(__float2half((offset >> 32) & 0xffff), halfScale);
-    arr[3] = __hmul(__float2half((offset >> 48) & 0xffff), halfScale);
-
-    __half r1 = hsqrt(__hmul(halfNTwo, hlog(arr[0])));
-    __half r2 = hsqrt(__hmul(halfNTwo, hlog(arr[1])));
-    __half theta1 = __hmul(halfTwoPi, arr[2]);
-    __half theta2 = __hmul(halfTwoPi, arr[3]);
-    __half sin1 = hsin(theta1);
-    __half cos1 = hcos(theta1);
-    __half sin2 = hsin(theta2);
-    __half cos2 = hcos(theta2);
-
-    arr[0] = __hmul(r1, cos1);
-    arr[1] = __hmul(r1, sin1);
-    arr[2] = __hmul(r2, cos2);
-    arr[3] = __hmul(r2, sin2);
+    arr[0] = __float2half(r1 * cos2);
+    arr[1] = __float2half(r1 * sin2);
+    arr[2] = __float2half(r2 * cos1);
+    arr[3] = __float2half(r2 * sin1);
     *((uint64_t*)output + idx) = *(uint64_t*)arr;
  }
 
@@ -75,16 +73,9 @@ void TestStats(void* gpuHalfArr, void* cpuArr, uint64_t f16s)
 {
     cudaMemcpy(cpuArr, gpuHalfArr, f16s << 2, cudaMemcpyDeviceToHost);
 
-    uint64_t errIdx = 0x8;
     double sum = 0;
     for (uint64_t i = 0; i < f16s; i++)
-    {
-        // check if NaN
-        float f = __half2float(((__half*)cpuArr)[i]);
-        if (f != f)
-            errIdx = i;
-        sum += f;
-    }
+        sum += __half2float(((__half*)cpuArr)[i]);
     double mean = sum / f16s;
     printf("mean: %f\n", mean);
 
@@ -100,7 +91,7 @@ void TestStats(void* gpuHalfArr, void* cpuArr, uint64_t f16s)
     double stdDev = sqrt(variance);
     printf("standard deviation: %f\n\n", stdDev);
 
-    for (uint64_t i = errIdx - 0x8; i < errIdx + 0x8; i++)
+    for (uint64_t i = 0x400; i < 0x40f; i++)
         printf("%f\n", __half2float(((__half*)cpuArr)[i]));
     printf("\n\n");
 }
