@@ -8,13 +8,27 @@
 __global__ void CudaTest(const void* output, uint32_t seed1, uint32_t seed2)
 {
     const float scale = 0.0000152587890625f;
+    const __half twoPi = __float2half(6.283185307179586476925286766559f);
+    const __half negTwo = __float2half(-2.0f);
     uint32_t idx = threadIdx.x + (blockIdx.x << 10);
 
     seed1 = (0xE558D374 ^ idx + seed1 ^ seed2) * 0xAA69E974;
     seed1 = (seed1 >> 13 ^ seed1) * 0x8B7A1B65;
 
-    ((__half*)&seed1)[0] = __float2half((((uint16_t*)&seed1)[0] | 1) * scale);
-    ((__half*)&seed1)[1] = __float2half((((uint16_t*)&seed1)[1] | 1) * scale);
+    // ((__half*)&seed1)[0]
+
+    ((__half*)&seed1)[0] = __float2half((((uint16_t*)&seed1)[0] | 0xf) * scale);
+    ((__half*)&seed1)[1] = __float2half((((uint16_t*)&seed1)[1] | 0xf) * scale);
+
+    // box muller transform
+    /*__half r = hrsqrt(__hmul(negTwo, hlog(u1)));
+    __half theta = __hmul(twoPi, u2);
+    __half sin = hsin(theta);
+    __half cos = hcos(theta);
+
+     = __hmul(r, cos);
+	((__half*)&seed1)[1] = __hmul(r, sin);*/
+
 
     *((uint32_t*)output + idx) = *(uint32_t*)&seed1;
 }
@@ -71,7 +85,12 @@ int main()
     cudaMemcpy(cpuArr, gpuHalfArr, f16s << 2, cudaMemcpyDeviceToHost);
     mean = 0;
     for (uint32_t i = 0; i < f16s; ++i)
-        mean += __half2float(*((__half*)cpuArr + i));
+    {
+        float h = __half2float(*((__half*)cpuArr + i));
+        mean += h;
+        if (h == 0)
+            printf("0 at %d\n", i);
+    }
     mean /= f16s;
     printf("mean: %f\n", mean);
 
