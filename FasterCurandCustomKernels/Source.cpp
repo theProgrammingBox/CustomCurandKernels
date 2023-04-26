@@ -13,11 +13,10 @@ __global__ void CudaTest(const void* output, uint32_t seed1, uint32_t seed2)
     seed1 = (0xE558D374 ^ idx + seed1 ^ seed2) * 0xAA69E974;
     seed1 = (seed1 >> 13 ^ seed1) * 0x8B7A1B65;
 
-    __half halfOutputs[2];
-    halfOutputs[0] = __float2half((*(uint16_t*)&seed1 | 1) * scale);
-    halfOutputs[1] = __float2half((((uint16_t*)&seed1)[1] | 1) * scale);
+    ((__half*)&seed1)[0] = __float2half((((uint16_t*)&seed1)[0] | 1) * scale);
+    ((__half*)&seed1)[1] = __float2half((((uint16_t*)&seed1)[1] | 1) * scale);
 
-    *((uint32_t*)output + idx) = *(uint32_t*)halfOutputs;
+    *((uint32_t*)output + idx) = *(uint32_t*)&seed1;
 }
 
 void Test(const void* output, uint64_t f16s, uint32_t seed1 = 0, uint32_t seed2 = 0)
