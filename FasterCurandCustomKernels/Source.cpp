@@ -1,4 +1,4 @@
-#include <iostream>
+﻿#include <iostream>
 #include <assert.h>
 #include <chrono>
 #include <cuda_runtime.h>
@@ -7,23 +7,23 @@
 
 __global__ void CudaTest(const void* output, uint32_t seed1, uint32_t seed2)
 {
-    const float weight = 0.0000152587890625f;
+    const uint32_t specialConstant1 = 0x37800080;
+    const uint32_t specialConstant2 = 0x38C910A4;
     const float negTwo = -2.0f;
-    const float twoPi = 6.283185307179586476925286766559f;
     const uint32_t idx = threadIdx.x + (blockIdx.x << 10);
 
     seed1 = (0xE558D374 ^ idx + seed1 ^ seed2) * 0xAA69E974;
     seed1 = (seed1 >> 13 ^ seed1) * 0x8B7A1B65;
 
-    const float u1 = (((uint16_t*)&seed1)[0] | 1) * weight;
-    const float u2 = ((uint16_t*)&seed1)[1] * weight;
+    const float u1 = (((uint16_t*)&seed1)[0] | 1) * *(float*)&specialConstant1;
+    const float u2 = ((uint16_t*)&seed1)[1] * *(float*)&specialConstant2;
 
     const float r = sqrtf(negTwo * logf(u1));
     float cos, sin;
-    sincosf(twoPi * u2, &sin, &cos);
+    sincosf(u2, &sin, &cos);
 
     ((__half*)&seed1)[0] = __float2half(r * cos);
-	((__half*)&seed1)[1] = __float2half(r * sin);
+    ((__half*)&seed1)[1] = __float2half(r * sin);
 
     *((uint32_t*)output + idx) = *(uint32_t*)&seed1;
 }
@@ -100,6 +100,9 @@ int main()
 
     stdDev = sqrt(variance);
     printf("stdDev: %f\n\n", stdDev);
+
+    for (uint32_t i = 0; i < 0xf; ++i)
+		printf("%f\n", __half2float(*((__half*)cpuArr + i)));
 
     return 0;
 }
