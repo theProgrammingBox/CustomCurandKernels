@@ -5,6 +5,12 @@
 #include <curand.h>
 #include <cuda_fp16.h>
 
+/*
+TODO:
+0. graph the probability of r^2 when plotting points in a circle
+1. see if 
+*/
+
 __global__ void CudaTest(const void* output, uint32_t seed1, uint32_t seed2)
 {
     const uint32_t specialConstant1 = 0x37800080;
@@ -12,8 +18,8 @@ __global__ void CudaTest(const void* output, uint32_t seed1, uint32_t seed2)
     const float negTwo = -2.0f;
     const uint32_t idx = threadIdx.x + (blockIdx.x << 10);
 
-    seed1 = (0xE558D374 ^ idx + seed1 ^ seed2) * 0xAA69E974;
-    seed1 = (seed1 >> 13 ^ seed1) * 0x8B7A1B65;
+    seed1 = ((0xE558D374 ^ idx) + seed1) * 0xAA69E974;
+    seed1 = (seed1 >> 13 ^ seed1 ^ seed2) * 0x8B7A1B65;
 
     const float u1 = (((uint16_t*)&seed1)[0] | 1) * *(float*)&specialConstant1;
     const float u2 = ((uint16_t*)&seed1)[1] * *(float*)&specialConstant2;
